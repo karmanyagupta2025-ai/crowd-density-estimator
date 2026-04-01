@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.env
+.venv/
+venv/
+env/
+ENV/
+.ipynb_checkpoints/
+*.log
+*.sqlite3
+*.mp4
+*.avi
+*.mkv
+*.DS_Store
+.vscode/
+.idea/
