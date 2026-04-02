@@ -14,3 +14,6 @@ ENV/
 *.DS_Store
 .vscode/
 .idea/
+outputs/
+models/checkpoints/
+data/raw/
