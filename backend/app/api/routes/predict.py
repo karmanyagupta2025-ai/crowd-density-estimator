@@ -1,23 +1,31 @@
 from fastapi import APIRouter, UploadFile, File, HTTPException
-import numpy as np
-import cv2
+from fastapi.responses import JSONResponse
+import base64
+import io
 
-from app.schemas.prediction import PredictionResponse
 from app.services.predictor import run_prediction
 
 router = APIRouter(prefix="/predict", tags=["Predict"])
 
-@router.post("", response_model=PredictionResponse)
+@router.post("")
 async def predict(file: UploadFile = File(...)):
-    if file.content_type not in ["image/jpeg", "image/png", "image/jpg"]:
-        raise HTTPException(status_code=400, detail="Only JPG and PNG images are allowed")
+    if file.content_type not in ["image/jpeg", "image/png", "image/jpg", "image/webp"]:
+        raise HTTPException(status_code=400, detail="Only JPG, PNG, and WEBP images are allowed")
 
     contents = await file.read()
-    np_array = np.frombuffer(contents, np.uint8)
-    image = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+    if not contents:
+        raise HTTPException(status_code=400, detail="Empty file received")
 
-    if image is None:
-        raise HTTPException(status_code=400, detail="Could not decode image")
+    try:
+        result_img, count = run_prediction(contents)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
 
-    result = run_prediction(image, file.filename)
-    return result
+    buffer = io.BytesIO()
+    result_img.save(buffer, format="PNG")
+    encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    return JSONResponse({
+        "count": count,
+        "heatmap_base64": f"data:image/png;base64,{encoded}"
+    })
