@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from backend.app.services.predictor import run_prediction
 import base64
 import io
 from PIL import Image
@@ -35,9 +36,7 @@ async def predict(file: UploadFile = File(...)):
     try:
         # =====================================================
         # PLACEHOLDER — replace this block with your model
-        img = Image.open(io.BytesIO(contents)).convert("RGB")
-        count = 0  # replace with real count from model
-        result_img = img  # replace with heatmap image from model
+        result_img, count = run_prediction(contents)
         # =====================================================
 
         buffer = io.BytesIO()
