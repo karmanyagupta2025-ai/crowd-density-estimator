@@ -1,0 +1,48 @@
+1.
+import kagglehub
+
+# Download latest version
+path = kagglehub.dataset_download("fmena14/crowd-counting")
+print("Path to dataset files:", path)
+
+2.
+import kagglehub
+
+# Download latest version
+path = kagglehub.dataset_download("ferasoughali/mall-crowd-estimation")
+print("Path to dataset files:", path)
+
+4.
+import kagglehub
+
+# Download latest version
+path = kagglehub.dataset_download("tthien/shanghaitech-with-people-density-map")
+print("Path to dataset files:", path)
+
+5.
+import kagglehub
+
+# Download latest version
+path = kagglehub.dataset_download("xyyu18/shanghaitech-crowd-counting-dataset")
+print("Path to dataset files:", path)
+
+6.
+import kagglehub
+
+# Download latest version
+path = kagglehub.dataset_download("hosammhmdali/shanghai-tech-dataset-part-a-and-part-b")
+print("Path to dataset files:", path)
+
+7.
+import kagglehub
+
+# Download latest version
+path = kagglehub.dataset_download("faihajalamtopu/ucf-qnrf")
+print("Path to dataset files:", path)
+
+8.
+import kagglehub
+
+# Download latest version
+path = kagglehub.dataset_download("hoangxuanviet/jhu-crowd")
+print("Path to dataset files:", path)
