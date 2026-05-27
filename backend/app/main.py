@@ -2,6 +2,8 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from backend.app.services.predictor import run_prediction
+from backend.app.database import predictions_collection
+
 import base64
 import io
 from PIL import Image
@@ -37,6 +39,12 @@ async def predict(file: UploadFile = File(...)):
         # =====================================================
         # PLACEHOLDER — replace this block with your model
         result_img, count = run_prediction(contents)
+        prediction_data={
+            "filename": file.filename,
+            "crowd_count": count,
+            "model": "YOLOv5"
+        }
+        predictions_collection.insert_one(prediction_data)
         # =====================================================
 
         buffer = io.BytesIO()
