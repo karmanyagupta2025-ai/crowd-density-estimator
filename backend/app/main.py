@@ -3,9 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from backend.app.services.predictor import run_prediction
 from backend.app.database import predictions_collection
+from datetime import datetime
 
 import base64
 import io
+import traceback
 from PIL import Image
 
 app = FastAPI()
@@ -42,7 +44,8 @@ async def predict(file: UploadFile = File(...)):
         prediction_data={
             "filename": file.filename,
             "crowd_count": count,
-            "model": "YOLOv5"
+            "model": "YOLOv5",
+            "timestamp": datetime.utcnow()
         }
         predictions_collection.insert_one(prediction_data)
         # =====================================================
@@ -57,4 +60,5 @@ async def predict(file: UploadFile = File(...)):
         })
 
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")

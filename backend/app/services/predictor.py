@@ -2,6 +2,7 @@ import torch
 from PIL import Image
 from PIL import ImageEnhance, ImageFilter
 import numpy as np
+import cv2
 import io
 
 # Load YOLOv5 model once
@@ -36,11 +37,43 @@ def run_prediction(image_bytes: bytes):
         # Run YOLOv5 inference
         results = model(img, size=960)
 
-        # Render bounding boxes on image
-        results.render()
+        # Convert PIL image to OpenCV format
+        img_cv = np.array(img)
 
-        # Get rendered image
-        rendered_img = results.ims[0]
+        # Create empty heatmap
+        heatmap = np.zeros((img_cv.shape[0], img_cv.shape[1]), dtype=np.float32)
+
+        # Count persons
+        predicted_count = 0
+
+        # Generate density points
+        for *box, conf, cls in results.xyxy[0]:
+
+            if int(cls) == 0:
+                predicted_count += 1
+
+                x1, y1, x2, y2 = map(int, box)
+
+                # Find center point
+                center_x = (x1 + x2) // 2
+                center_y = (y1 + y2) // 2
+
+                # Draw density point
+                cv2.circle(heatmap, (center_x, center_y), 20, 1, -1)
+
+        # Apply Gaussian blur
+        heatmap = cv2.GaussianBlur(heatmap, (51, 51), 0)
+
+        # Normalize heatmap
+        if np.max(heatmap)>0:
+            heatmap = np.uint8(255 * heatmap / np.max(heatmap))
+        else:
+            heatmap=np.vint8(heatmap)
+        # Apply color map
+        heatmap_color = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+
+        # Overlay heatmap on image
+        overlay = cv2.addWeighted(img_cv, 0.6, heatmap_color, 0.4, 0)
 
         # Count detections
         predicted_count = 0
@@ -50,7 +83,7 @@ def run_prediction(image_bytes: bytes):
                 predicted_count += 1
 
         # Convert numpy array to PIL image
-        result_img = Image.fromarray(rendered_img)
+        result_img = Image.fromarray(overlay)
 
         return result_img, predicted_count
     except Exception as e:
