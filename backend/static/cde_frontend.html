@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -60,16 +61,15 @@
                     <div class="card-body">
                         
                         <div id="uploadZone" class="upload-box text-center p-5 mb-3">
-                            <input type="file" id="fileInput" accept="image/png, image/jpeg, image/webp" class="d-none">
+                            <input type="file" id="fileInput" accept="image/png, image/jpeg, image/webp, video/mp4, video/webm, video/quicktime" class="d-none">
                             <i class="fa-solid fa-cloud-arrow-up fa-3x text-secondary mb-3"></i>
-                            <p class="mb-1">Click or drag image here</p>
-                            <small class="text-muted">JPG, PNG (Max 20MB)</small>
+                            <p class="mb-1">Click or drag media here</p>
+                            <small class="text-muted">JPG, PNG, MP4, WebM (Max 20MB)</small>
                         </div>
 
                         <div id="previewContainer" class="d-none mb-3">
                             <div class="position-relative">
-                                <img id="previewImg" src="" class="img-fluid rounded border mb-2" alt="Upload preview">
-                                <button id="btnRemove" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2">
+                                <button id="btnRemove" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2" style="z-index: 10;">
                                     <i class="fa-solid fa-trash"></i>
                                 </button>
                             </div>
@@ -132,7 +132,6 @@
         const uploadZone = document.getElementById('uploadZone');
         const fileInput = document.getElementById('fileInput');
         const previewContainer = document.getElementById('previewContainer');
-        const previewImg = document.getElementById('previewImg');
         const previewFilename = document.getElementById('previewFilename');
         const btnRemove = document.getElementById('btnRemove');
         const btnGenerate = document.getElementById('btnGenerate');
@@ -146,7 +145,6 @@
         const btnDownload = document.getElementById('btnDownload');
         const statusBadge = document.getElementById('statusBadge');
         const errorMsg = document.getElementById('errorMsg');
-
         let currentFile = null;
 
         uploadZone.addEventListener('click', () => fileInput.click());
@@ -176,17 +174,38 @@
 
         function handleFileSelection(file) {
             errorMsg.classList.add('d-none');
-
-            if (!file.type.startsWith('image/')) {
-                showError('Please upload a valid image file.');
+            
+            if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) {
+                showError('Please upload a valid image or video file.');
                 return;
             }
 
             currentFile = file;
-            
             const reader = new FileReader();
             reader.onload = (e) => {
-                previewImg.src = e.target.result;
+                const previewWrapper = document.querySelector('#previewContainer .position-relative');
+                
+                const oldImg = document.getElementById('previewImg');
+                const oldVid = document.getElementById('previewVid');
+                if (oldImg) oldImg.remove();
+                if (oldVid) oldVid.remove();
+
+                if (file.type.startsWith('image/')) {
+                    const img = document.createElement('img');
+                    img.id = 'previewImg';
+                    img.className = 'img-fluid rounded border mb-2';
+                    img.src = e.target.result;
+                    img.alt = 'Upload preview';
+                    previewWrapper.insertBefore(img, btnRemove);
+                } else if (file.type.startsWith('video/')) {
+                    const vid = document.createElement('video');
+                    vid.id = 'previewVid';
+                    vid.className = 'img-fluid rounded border mb-2';
+                    vid.src = e.target.result;
+                    vid.controls = true;
+                    previewWrapper.insertBefore(vid, btnRemove);
+                }
+
                 previewFilename.textContent = file.name;
                 
                 uploadZone.classList.add('d-none');
@@ -205,6 +224,7 @@
             previewContainer.classList.add('d-none');
             uploadZone.classList.remove('d-none');
             btnGenerate.disabled = true;
+            
             errorMsg.classList.add('d-none');
             
             resetOutputPanel();
@@ -270,7 +290,6 @@
 
             } catch (err) {
                 showError(err.message === 'Failed to fetch' ? 'Cannot connect to backend API. Is the server running?' : err.message);
-                
                 loadingSpinner.classList.add('d-none');
                 outputPlaceholder.classList.remove('d-none');
             } finally {
@@ -287,3 +306,5 @@
     </script>
 </body>
 </html>
+
+```
