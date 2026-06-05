@@ -290,9 +290,10 @@ if (currentFile.type.startsWith('video/')) {
     const outputVideo =
         document.getElementById('outputVideo');
 
-    outputVideo.src = data.output_video;
+outputVideo.src = "http://127.0.0.1:5000" + data.output_video;
 
     loadingSpinner.classList.add('d-none');
+    outputPlaceholder.classList.add('d-none');  
 
     outputVideo.classList.remove('d-none');
 

@@ -11,6 +11,8 @@ import base64
 import io
 import traceback
 from PIL import Image
+import os
+os.makedirs("outputs", exist_ok=True)
 
 app = FastAPI()
 
@@ -56,7 +58,10 @@ async def predict(file: UploadFile = File(...)):
             "model": "YOLOv5",
             "timestamp": datetime.utcnow()
         }
-        predictions_collection.insert_one(prediction_data)
+        try:
+            predictions_collection.insert_one(prediction_data)
+        except Exception as db_err:
+            print(f"DB insert failed (non-fatal): {db_err}")
         # =====================================================
 
         buffer = io.BytesIO()

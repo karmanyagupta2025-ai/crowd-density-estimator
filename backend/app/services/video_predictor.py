@@ -1,138 +1,113 @@
 import cv2
 import numpy as np
 import torch
+import subprocess
+import os
 import warnings
 from PIL import Image
+
 warnings.filterwarnings('ignore')
-#Load Model
+
+# Load model once
 model = torch.hub.load(
     'ultralytics/yolov5',
     'custom',
     path='backend/models/best.pt',
     force_reload=False
 )
+model.conf = 0.4
+model.iou = 0.45
 
-#Video Function
+
 def process_video(video_path, output_path):
 
-    #Open the Input Video
-    cap = cv2.VideoCapture(video_path)
+    temp_path = output_path.replace(".mp4", "_temp.mp4")
 
-    #Get Video Properties
+    # Open input video
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise RuntimeError(f"Could not open video file: {video_path}")
+
+    # Get video properties
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
     fps = cap.get(cv2.CAP_PROP_FPS)
-    if fps<=0:
-        fps=30
+    if fps <= 0:
+        fps = 30
 
-
-    #Define codec and output writer
+    # Write to temp file using mp4v first
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-
-    out = cv2.VideoWriter(
-        output_path,
-        fourcc,
-        fps,
-        (width, height)
-    )
+    out = cv2.VideoWriter(temp_path, fourcc, fps, (width, height))
 
     frame_count = 0
-
+    last_overlay = None
 
     while True:
-
-        #Read Frame
         ret, frame = cap.read()
-
         if not ret:
             break
+
         frame_count += 1
 
-        #Processing the 5th frame only every time
-        if frame_count % 5 !=0:
-            continue
+        # Run inference only on every 5th frame
+        if frame_count % 5 == 0:
+            results = model(frame, size=640)
 
-        # Run YOLO inference
-        results = model(frame, size=640)
+            heatmap = np.zeros((frame.shape[0], frame.shape[1]), dtype=np.float32)
+            predicted_count = 0
 
-        # Create empty heatmap
-        heatmap = np.zeros(
-            (frame.shape[0], frame.shape[1]),
-            dtype=np.float32
-        )
+            for *box, conf, cls in results.xyxy[0]:
+                if int(cls) == 0:
+                    predicted_count += 1
+                    x1, y1, x2, y2 = map(int, box)
+                    center_x = (x1 + x2) // 2
+                    center_y = (y1 + y2) // 2
+                    cv2.circle(heatmap, (center_x, center_y), 20, 1, -1)
 
-        # Count people
-        predicted_count = 0
+            heatmap = cv2.GaussianBlur(heatmap, (51, 51), 0)
 
-        # Process detections
-        for *box, conf, cls in results.xyxy[0]:
+            if np.max(heatmap) > 0:
+                heatmap = np.uint8(255 * heatmap / np.max(heatmap))
+            else:
+                heatmap = np.uint8(heatmap)
 
-            # Class 0 = person
-            if int(cls) == 0:
-                predicted_count += 1
-
-                x1, y1, x2, y2 = map(int, box)
-
-                # Find center point
-                center_x = (x1 + x2) // 2
-                center_y = (y1 + y2) // 2
-
-                # Draw density point
-                cv2.circle(
-                    heatmap,
-                    (center_x, center_y),
-                    20,
-                    1,
-                    -1
-                )
-
-        # Apply Gaussian blur
-        heatmap = cv2.GaussianBlur(
-            heatmap,
-            (51, 51),
-            0
-        )
-
-        # Normalize safely
-        if np.max(heatmap) > 0:
-            heatmap = np.uint8(
-                255 * heatmap / np.max(heatmap)
+            heatmap_color = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+            overlay = cv2.addWeighted(frame, 0.6, heatmap_color, 0.4, 0)
+            cv2.putText(
+                overlay,
+                f'Crowd Count: {predicted_count}',
+                (20, 40),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (255, 255, 255),
+                2
             )
+            last_overlay = overlay
+
         else:
-            heatmap = np.uint8(heatmap)
+            # Use last processed overlay, or raw frame if no inference yet
+            overlay = last_overlay if last_overlay is not None else frame
 
-        # Apply color map
-        heatmap_color = cv2.applyColorMap(
-            heatmap,
-            cv2.COLORMAP_JET
-        )
-
-        # Overlay heatmap on frame
-        overlay = cv2.addWeighted(
-            frame,
-            0.6,
-            heatmap_color,
-            0.4,
-            0
-        )
-
-        # Add crowd count text
-        cv2.putText(
-            overlay,
-            f'Crowd Count: {predicted_count}',
-            (20, 40),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            1,
-            (255, 255, 255),
-            2
-        )
-
-        # Write processed frame
         out.write(overlay)
-
-
-        # Release resources
 
     cap.release()
     out.release()
+
+    # Re-encode to H.264 for browser compatibility
+    result = subprocess.run([
+        "ffmpeg", "-y",
+        "-i", temp_path,
+        "-vcodec", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-movflags", "+faststart",
+        output_path
+    ], capture_output=True)
+
+    # Clean up temp file
+    if os.path.exists(temp_path):
+        os.remove(temp_path)
+
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"FFmpeg re-encode failed:\n{result.stderr.decode()}"
+        )
