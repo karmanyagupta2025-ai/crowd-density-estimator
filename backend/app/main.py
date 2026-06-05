@@ -1,6 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from backend.app.services.predictor import run_prediction
 from backend.app.services.video_predictor import process_video
 from backend.app.database import predictions_collection
@@ -13,6 +14,7 @@ from PIL import Image
 
 app = FastAPI()
 
+
 # CORS — must be added BEFORE any routes
 app.add_middleware(
     CORSMiddleware,
@@ -22,6 +24,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+#Static Files
+app.mount(
+    "/outputs",
+    StaticFiles(directory="outputs"),
+    name="outputs"
+)
 
 @app.get("/")
 def health():
@@ -90,7 +98,7 @@ async def predict_video(file: UploadFile = File(...)):
 
         return JSONResponse({
             "message": "Video processed successfully",
-            "output_video": output_path
+            "output_video": f"/outputs/processed_{file.filename}"
         })
 
     except Exception as e:

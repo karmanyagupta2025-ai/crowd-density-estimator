@@ -21,7 +21,11 @@ def process_video(video_path, output_path):
     #Get Video Properties
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+
     fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps<=0:
+        fps=30
+
 
     #Define codec and output writer
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -34,6 +38,7 @@ def process_video(video_path, output_path):
     )
 
     frame_count = 0
+
 
     while True:
 
@@ -126,6 +131,8 @@ def process_video(video_path, output_path):
         # Write processed frame
         out.write(overlay)
 
+
         # Release resources
+
     cap.release()
     out.release()

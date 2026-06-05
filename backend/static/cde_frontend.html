@@ -106,7 +106,15 @@
                         </div>
 
                         <div class="canvas-wrapper bg-light border rounded d-flex align-items-center justify-content-center flex-grow-1 mb-3" style="min-height: 250px;">
-                            <canvas id="outputCanvas" class="img-fluid d-none"></canvas>
+                            <canvas id="outputCanvas" class="img-fluid d-none">
+
+</canvas>
+	<video
+id="outputVideo"
+class="img-fluid d-none"
+controls>
+</video>
+
                             
                             <div id="outputPlaceholder" class="text-center text-muted p-4">
                                 <i class="fa-solid fa-chart-area fa-2x mb-2"></i>
@@ -237,6 +245,8 @@
 
         function resetOutputPanel() {
             outputCanvas.classList.add('d-none');
+	    document.getElementById('outputVideo')
+    .classList.add('d-none');
             outputPlaceholder.classList.remove('d-none');
             crowdCountWrap.classList.add('d-none');
             statusBadge.classList.add('d-none');
@@ -246,7 +256,14 @@
         btnGenerate.addEventListener('click', async () => {
             if (!currentFile) return;
 
-            const endpoint = apiEndpointInput.value.trim();
+            let endpoint = '';
+
+if (currentFile.type.startsWith('video/')) {
+    endpoint = 'http://127.0.0.1:5000/predict-video';
+}
+else {
+    endpoint = 'http://127.0.0.1:5000/predict';
+}
             
             btnGenerate.disabled = true;
             errorMsg.classList.add('d-none');
@@ -268,26 +285,56 @@
 
                 const data = await response.json();
 
-                if (data.count !== undefined) {
-                    crowdCountValue.textContent = Math.round(data.count);
-                    crowdCountWrap.classList.remove('d-none');
-                }
+if (currentFile.type.startsWith('video/')) {
 
-                const img = new Image();
-                img.onload = () => {
-                    const ctx = outputCanvas.getContext('2d');
-                    outputCanvas.width = img.width;
-                    outputCanvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
+    const outputVideo =
+        document.getElementById('outputVideo');
 
-                    loadingSpinner.classList.add('d-none');
-                    outputCanvas.classList.remove('d-none');
-                    statusBadge.classList.remove('d-none');
-                    btnDownload.classList.remove('d-none');
-                };
-                
-                img.src = data.heatmap_url || data.heatmap_base64 || data.image || data.result;
+    outputVideo.src = data.output_video;
 
+    loadingSpinner.classList.add('d-none');
+
+    outputVideo.classList.remove('d-none');
+
+    statusBadge.classList.remove('d-none');
+
+}
+else {
+
+    if (data.count !== undefined) {
+        crowdCountValue.textContent =
+            Math.round(data.count);
+
+        crowdCountWrap.classList.remove('d-none');
+    }
+
+    const img = new Image();
+
+    img.onload = () => {
+
+        const ctx =
+            outputCanvas.getContext('2d');
+
+        outputCanvas.width = img.width;
+        outputCanvas.height = img.height;
+
+        ctx.drawImage(img, 0, 0);
+
+        loadingSpinner.classList.add('d-none');
+
+        outputCanvas.classList.remove('d-none');
+
+        statusBadge.classList.remove('d-none');
+
+        btnDownload.classList.remove('d-none');
+    };
+
+    img.src =
+        data.heatmap_url ||
+        data.heatmap_base64 ||
+        data.image ||
+        data.result;
+}
             } catch (err) {
                 showError(err.message === 'Failed to fetch' ? 'Cannot connect to backend API. Is the server running?' : err.message);
                 loadingSpinner.classList.add('d-none');
