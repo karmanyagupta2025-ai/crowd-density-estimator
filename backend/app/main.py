@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.app.services.predictor import run_prediction
 from backend.app.services.video_predictor import process_video
 from backend.app.database import predictions_collection
+from backend.app.services.predictor import run_prediction, MODEL_TYPE
 from datetime import datetime
 
 import base64
@@ -55,7 +56,7 @@ async def predict(file: UploadFile = File(...)):
         prediction_data={
             "filename": file.filename,
             "crowd_count": count,
-            "model": "YOLOv5",
+            "model": MODEL_TYPE,
             "timestamp": datetime.utcnow()
         }
         try:
