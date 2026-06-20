@@ -220,9 +220,9 @@ Run the app and upload this image to generate a sample output heatmap.
 
 Karmanya Gupta - Backend, inference pipeline, frontend integration  
 Ishita Dokania - YOLOv8 model training, dataset preparation
-
-Siddhant Jain & Sabhya - Frontend, website designing
 Evani - Dataset preparation
+Siddhant Jain and Sabhya - Frontend, Website Designing
+
 ***
 
 ## License
