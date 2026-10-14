@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -81,6 +80,14 @@
                             <input type="text" id="apiEndpointInput" class="form-control form-control-sm" value="http://127.0.0.1:5000/predict">
                         </div>
 
+                        <div class="mb-3">
+                            <label for="cameraSelect" class="form-label small fw-bold">Camera / Location</label>
+                            <select id="cameraSelect" class="form-select" required>
+                                <option value="">Loading cameras...</option>
+                            </select>
+                            <small id="cameraInfo" class="text-muted">Choose the camera associated with this image.</small>
+                        </div>
+
                         <div id="errorMsg" class="alert alert-danger d-none py-2" role="alert">
                             <span id="errorText"></span>
                         </div>
@@ -104,6 +111,16 @@
                             <span><i class="fa-solid fa-users me-2"></i>Estimated Count:</span>
                             <strong id="crowdCountValue" class="fs-5">0</strong>
                         </div>
+
+                        <div id="resultDetails" class="border rounded p-3 mb-3 d-none">
+                            <div class="row g-2 small">
+                                <div class="col-5 text-muted">Camera</div><div class="col-7 fw-semibold" id="resultCamera">-</div>
+                                <div class="col-5 text-muted">Zone</div><div class="col-7 fw-semibold" id="resultZone">-</div>
+                                <div class="col-5 text-muted">Capacity limit</div><div class="col-7 fw-semibold" id="resultCapacity">-</div>
+                                <div class="col-5 text-muted">Event ID</div><div class="col-7 fw-semibold" id="resultEvent">-</div>
+                            </div>
+                        </div>
+                        <div id="alertResult" class="alert alert-warning d-none mb-3" role="alert"></div>
 
                         <div class="canvas-wrapper bg-light border rounded d-flex align-items-center justify-content-center flex-grow-1 mb-3" style="min-height: 250px;">
                             <canvas id="outputCanvas" class="img-fluid d-none">
@@ -136,6 +153,39 @@ controls>
         </div>
     </div>
 
+
+        <div class="row mt-2 mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="mb-0"><i class="fa-solid fa-clock-rotate-left me-2"></i>Detection History</h5>
+                        <button id="refreshDetectionHistory" class="btn btn-sm btn-outline-primary" type="button">Refresh</button>
+                    </div>
+                    <div class="card-body"><div class="table-responsive">
+                        <table class="table table-sm table-striped table-hover align-middle mb-0">
+                            <thead><tr><th>Event ID</th><th>Timestamp</th><th>Camera</th><th>Zone</th><th>People</th><th>Capacity</th><th>Status</th></tr></thead>
+                            <tbody id="detectionHistoryBody"><tr><td colspan="7" class="text-muted text-center">Loading detection history...</td></tr></tbody>
+                        </table>
+                    </div></div>
+                </div>
+            </div>
+        </div>
+        <div class="row mb-5">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                        <h5 class="mb-0"><i class="fa-solid fa-triangle-exclamation me-2"></i>Alert History</h5>
+                        <button id="refreshAlertHistory" class="btn btn-sm btn-outline-primary" type="button">Refresh</button>
+                    </div>
+                    <div class="card-body"><div class="table-responsive">
+                        <table class="table table-sm table-striped table-hover align-middle mb-0">
+                            <thead><tr><th>Alert ID</th><th>Timestamp</th><th>Camera</th><th>Zone</th><th>People</th><th>Capacity</th><th>Message</th></tr></thead>
+                            <tbody id="alertHistoryBody"><tr><td colspan="7" class="text-muted text-center">Loading alert history...</td></tr></tbody>
+                        </table>
+                    </div></div>
+                </div>
+            </div>
+        </div>
     <script>
         const uploadZone = document.getElementById('uploadZone');
         const fileInput = document.getElementById('fileInput');
@@ -153,7 +203,124 @@ controls>
         const btnDownload = document.getElementById('btnDownload');
         const statusBadge = document.getElementById('statusBadge');
         const errorMsg = document.getElementById('errorMsg');
+        const cameraSelect = document.getElementById('cameraSelect');
+        const cameraInfo = document.getElementById('cameraInfo');
+        const resultDetails = document.getElementById('resultDetails');
+        const alertResult = document.getElementById('alertResult');
         let currentFile = null;
+
+        function getApiBase() {
+            return apiEndpointInput.value.trim().replace(/\/predict\/?$/, '');
+        }
+
+        async function loadCameras() {
+            try {
+                const response = await fetch(`${getApiBase()}/cameras`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const cameras = await response.json();
+                cameraSelect.innerHTML = '<option value="">Select a camera...</option>';
+                cameras.forEach(camera => {
+                    const option = document.createElement('option');
+                    option.value = camera.camera_id;
+                    option.textContent = `${camera.location_name} (${camera.zone_name})`;
+                    option.dataset.zone = camera.zone_name;
+                    option.dataset.capacity = camera.capacity_limit;
+                    option.dataset.status = camera.status;
+                    cameraSelect.appendChild(option);
+                });
+                if (cameras.length === 0) {
+                    cameraSelect.innerHTML = '<option value="">No active cameras found</option>';
+                }
+                updateCameraInfo();
+            } catch (error) {
+                cameraSelect.innerHTML = '<option value="">Could not load cameras</option>';
+                cameraInfo.textContent = 'Check that the backend is running and the API endpoint is correct.';
+            }
+        }
+
+        function updateCameraInfo() {
+            const option = cameraSelect.selectedOptions[0];
+            if (option && option.value) {
+                cameraInfo.textContent = `Zone: ${option.dataset.zone} | Capacity: ${option.dataset.capacity} people`;
+            } else {
+                cameraInfo.textContent = 'Choose the camera associated with this image.';
+            }
+        }
+
+        cameraSelect.addEventListener('change', updateCameraInfo);
+        apiEndpointInput.addEventListener('change', loadCameras);
+        loadCameras();
+
+        function escapeHtml(value) {
+            return String(value ?? '').replace(/[&<>"']/g, character => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[character]));
+        }
+
+        function formatHistoryTimestamp(value) {
+            return value ? new Date(value).toLocaleString() : '-';
+        }
+
+        async function loadDetectionHistory() {
+            const tbody = document.getElementById('detectionHistoryBody');
+            tbody.innerHTML = '<tr><td colspan="7" class="text-muted text-center">Loading...</td></tr>';
+            try {
+                const response = await fetch(`${getApiBase()}/detection-history`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const rows = await response.json();
+                if (!rows.length) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-muted text-center">No detections recorded yet.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = rows.map(row => `
+                    <tr>
+                        <td>${escapeHtml(row.event_id)}</td>
+                        <td>${escapeHtml(formatHistoryTimestamp(row.timestamp))}</td>
+                        <td>${escapeHtml(row.location_name)}</td>
+                        <td>${escapeHtml(row.zone_name)}</td>
+                        <td>${escapeHtml(row.person_count)}</td>
+                        <td>${escapeHtml(row.capacity_limit)}</td>
+                        <td><span class="badge ${row.status === 'Overcrowding' ? 'bg-danger' : 'bg-success'}">${escapeHtml(row.status)}</span></td>
+                    </tr>`).join('');
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-danger text-center">Could not load detection history. Check the backend.</td></tr>';
+            }
+        }
+
+        async function loadAlertHistory() {
+            const tbody = document.getElementById('alertHistoryBody');
+            tbody.innerHTML = '<tr><td colspan="7" class="text-muted text-center">Loading...</td></tr>';
+            try {
+                const response = await fetch(`${getApiBase()}/alert-history`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const rows = await response.json();
+                if (!rows.length) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-muted text-center">No alerts recorded yet.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = rows.map(row => `
+                    <tr>
+                        <td>${escapeHtml(row.alert_id)}</td>
+                        <td>${escapeHtml(formatHistoryTimestamp(row.triggered_at))}</td>
+                        <td>${escapeHtml(row.location_name)}</td>
+                        <td>${escapeHtml(row.zone_name)}</td>
+                        <td>${escapeHtml(row.person_count)}</td>
+                        <td>${escapeHtml(row.capacity_limit)}</td>
+                        <td>${escapeHtml(row.message)}</td>
+                    </tr>`).join('');
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-danger text-center">Could not load alert history. Check the backend.</td></tr>';
+            }
+        }
+
+        document.getElementById('refreshDetectionHistory').addEventListener('click', loadDetectionHistory);
+        document.getElementById('refreshAlertHistory').addEventListener('click', loadAlertHistory);
+        apiEndpointInput.addEventListener('change', () => {
+            loadDetectionHistory();
+            loadAlertHistory();
+        });
+        loadDetectionHistory();
+        loadAlertHistory();
 
         uploadZone.addEventListener('click', () => fileInput.click());
 
@@ -250,16 +417,27 @@ controls>
             outputPlaceholder.classList.remove('d-none');
             crowdCountWrap.classList.add('d-none');
             statusBadge.classList.add('d-none');
+            statusBadge.classList.remove('bg-danger');
+            statusBadge.classList.add('bg-success');
+            statusBadge.textContent = 'Ready';
             btnDownload.classList.add('d-none');
+            resultDetails.classList.add('d-none');
+            alertResult.classList.add('d-none');
+            alertResult.textContent = '';
         }
 
         btnGenerate.addEventListener('click', async () => {
             if (!currentFile) return;
+            const isVideo = currentFile.type.startsWith('video/');
+            if (!isVideo && !cameraSelect.value) {
+                showError('Please select a camera/location before generating the heatmap.');
+                return;
+            }
 
             let endpoint = '';
 
-if (currentFile.type.startsWith('video/')) {
-    endpoint = 'http://127.0.0.1:5000/predict-video';
+if (isVideo) {
+    endpoint = getApiBase() + '/predict-video';
 }
 else {
     endpoint = 'http://127.0.0.1:5000/predict';
@@ -272,6 +450,7 @@ else {
 
             const formData = new FormData();
             formData.append('file', currentFile);
+            if (!isVideo) formData.append('camera_id', cameraSelect.value);
 
             try {
                 const response = await fetch(endpoint, {
@@ -285,7 +464,7 @@ else {
 
                 const data = await response.json();
 
-if (currentFile.type.startsWith('video/')) {
+if (isVideo) {
 
     const outputVideo =
         document.getElementById('outputVideo');
@@ -297,6 +476,7 @@ outputVideo.src = "http://127.0.0.1:5000" + data.output_video;
 
     outputVideo.classList.remove('d-none');
 
+    statusBadge.textContent = 'Video processed';
     statusBadge.classList.remove('d-none');
 
 }
@@ -307,6 +487,30 @@ else {
             Math.round(data.count);
 
         crowdCountWrap.classList.remove('d-none');
+    }
+
+    document.getElementById('resultCamera').textContent = data.location_name || `Camera ${data.camera_id}`;
+    document.getElementById('resultZone').textContent = data.zone_name || '-';
+    document.getElementById('resultCapacity').textContent = data.capacity_limit ?? '-';
+    document.getElementById('resultEvent').textContent = data.event_id ?? '-';
+    resultDetails.classList.remove('d-none');
+
+    if (data.alert) {
+        alertResult.textContent = `${data.alert.alert_type || 'Alert'}: ${data.alert.message || 'Overcrowding detected.'}`;
+        alertResult.classList.remove('d-none');
+        alertResult.classList.remove('alert-success');
+        alertResult.classList.add('alert-danger');
+        statusBadge.textContent = 'Alert triggered';
+        statusBadge.classList.remove('bg-success');
+        statusBadge.classList.add('bg-danger');
+    } else {
+        alertResult.textContent = 'No overcrowding alert. The count is within the zone capacity limit.';
+        alertResult.classList.remove('d-none');
+        alertResult.classList.remove('alert-danger');
+        alertResult.classList.add('alert-success');
+        statusBadge.textContent = 'Analysis complete';
+        statusBadge.classList.remove('bg-danger');
+        statusBadge.classList.add('bg-success');
     }
 
     const img = new Image();
@@ -354,5 +558,3 @@ else {
     </script>
 </body>
 </html>
-
-```
